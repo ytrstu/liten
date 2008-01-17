@@ -1,11 +1,11 @@
-#!/usr/bin/env python
-#01/13/08
+#!/usr/bin/env python2.4
+#01/17/08
 #Liten 0.1.3
 #A Deduplication Tool
 #Author:  Noah Gift
 #License:  MIT License
 #http://www.opensource.org/licenses/mit-license.php
-#Copyright (c) 2007, Noah Gift
+#Copyright (c) 2007, 2008 Noah Gift
 
 """
 A deduplication command line tool and library.  A relatively efficient
@@ -97,7 +97,7 @@ import sys
 import string
 import time
 import optparse
-import hashlib
+import md5
 import logging
 import pdb
 
@@ -211,7 +211,7 @@ class LitenBaseClass(object):
 
         try:
             fp = open(path)
-            checksum = hashlib.md5()
+            checksum = md5.new()
             while True:
                 buffer = fp.read(8192)
                 if not buffer:break
@@ -222,9 +222,6 @@ class LitenBaseClass(object):
             print "IO error for %s" % path
             checksum = None
             self.log().error('IO error for %s' % path)
-        finally:
-            if LITEN_DEBUG_MODE:
-                print "Performing checksum on: %s" % path
         return checksum
 
     def createSearchDate(self):
