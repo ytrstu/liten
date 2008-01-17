@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2.4
 
 # liten 0.1.3 -- deduplication command line tool
 #
