@@ -19,6 +19,7 @@ setup(name='liten',
       packages=find_packages(),
       zip_safe=False,
       entry_points="""
+      py_modules=['liten']
       [console_scripts]
       liten = liten:main
       """,
