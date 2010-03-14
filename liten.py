@@ -1,32 +1,31 @@
 #!/usr/bin/env python
-#Liten - Deduplication command line tool and library
-#Author:  Noah Gift
-#License:  MIT License
-#http://www.opensource.org/licenses/mit-license.php
-#Copyright (c) 2007,2008 Noah Gift
+#
+#  Liten - Deduplication command line tool and library
+#
+#  Copyright (c) 2007,2008 Noah Gift
+#  Copyright (c) 2009,2010 anatoly techtonik
+#
+#  License:  MIT License
+#  http://www.opensource.org/licenses/mit-license.php
+#
 
-__version__ = "0.1.5"
-__date__ = "2008-12-25"
+__version__ = "0.2-dev"
+__date__ = "2009-11-08"
 
 
-"""
+__doc__ = """
 Liten:  A deduplication command line tool and library
-===============================================================================
-
-:Author: Noah Gift
-:Version: $Revision: 0.1.5 $
-:Copyright: This document has been placed in the public domain.
+=====================================================
 
 Summary
 ---------
 
-A deduplication command line tool and library.  A relatively efficient
-algorithm based on searching like sized files, and then performing a full md5
-checksum, is used to determine duplicate files/file objects.  Files can be
-deleted upon discovery, and pattern matching can be used to limit search
-results. Finally, configuration file use is supported, and there is a
-developing API that lends itself to customization via an ActionsMixin class.
-
+Liten determines duplicate files/file objects using relatively efficient
+algorithm first selecting like sized files, and then performing a full md5
+checksum. Files can be deleted upon discovery, and pattern matching can
+be used to limit search scope. Finally, options can be read from
+configuration file. There is also unstable development API with behavior
+customization via ActionsMixin class.
 
 
 .. contents::
@@ -34,54 +33,48 @@ developing API that lends itself to customization via an ActionsMixin class.
 Example CLI Usage:
 ------------------
 
-
 Size:
 ~~~~~~~~~~~~~~~~~~~~~~
-
 Search by size using --size or -s option::
 
-	liten.py -s 1 /mnt/raid         is equal to liten.py -s 1MB /mnt/raid
-	liten.py -s 1bytes /mnt/raid
-	liten.py -s 1KB /mnt/raid
-	liten.py -s 1MB /mnt/raid
-	liten.py -s 1GB /mnt/raid
+    liten.py -s 1 /mnt/raid         is equal to liten.py -s 1MB /mnt/raid
+    liten.py -s 1bytes /mnt/raid
+    liten.py -s 1KB /mnt/raid
+    liten.py -s 1MB /mnt/raid
+    liten.py -s 1GB /mnt/raid
     liten.py c:\in d:\              is equal to liten.py -s 1MB c:\in d:\
 
 Report Location:
 ~~~~~~~~~~~~~~~~~~~~~~
+Path to generate duplication report -r or --report=/tmp/report.txt::
 
-Generate custom report path using -r or --report=/tmp/report.txt::
+    ./liten.py --report=/tmp/test.txt /Users/ngift/Documents
 
-	./liten.py --report=/tmp/test.txt /Users/ngift/Documents
-
-By default a report will be created in CWD, called LitenDuplicateReport.csv
+By default a report is created in current dir as LitenDuplicateReport.csv
 
 Config File:
 ~~~~~~~~~~~~~~~~~~~~~~
-
 You can use a config file in the following format::
 
-	[Options]
-	path=/tmp
-	size=1MB
-	pattern=*.m4v
-	delete=True
+    [Options]
+    path=/tmp
+    size=1MB
+    pattern=*.m4v
+    delete=True
 
 
 You can call the config file anything and place it anywhere.
 
 Here is an example usage::
 
-	./liten.py --config=myconfig.ini
+    ./liten.py --config=myconfig.ini
 
 Verbosity:
 ~~~~~~~~~~~~~~~~~~~~~~
-
-All stdout can be suppressed by using --quiet or -q.
+Screen output can be suppressed by using --quiet or -q.
 
 Delete:
 ~~~~~~~~~~~~~~~~~~~~~~
-
 By using --delete the duplicate files will be automatically deleted.  The API
 has support for an interactive mode and a dry-run mode, they have not been
 implemented in the CLI as of yet.
@@ -110,7 +103,7 @@ Tests:
  * Run Doctests:  ./liten -t or --test
  * Run test_liten.py
  * Run test_create_file.py then delete those test files using liten::
-	python2.5 liten.py --delete /tmp
+    python2.5 liten.py --delete /tmp
 
 Display Options:
 ---------------------------
@@ -119,18 +112,18 @@ Stdout:
 ~~~~~~~~~~~~~~~~~~~~~~
 stdout will show you duplicate file paths and sizes such as::
 
-	Printing dups over 1 MB using md5 checksum: [SIZE] [ORIG] [DUP]
-	7 MB  Orig:  /Users/ngift/Downloads/bzr-0-2.17.tar
-	Dupe:  /Users/ngift/Downloads/bzr-0-4.17.tar
+    Printing dups over 1 MB using md5 checksum: [SIZE] [ORIG] [DUP]
+    7 MB  Orig:  /Users/ngift/Downloads/bzr-0-2.17.tar
+    Dupe:  /Users/ngift/Downloads/bzr-0-4.17.tar
 
 Report:
 ~~~~~~~~~~~~~~~~~~~~~~
-A report named LitenDuplicateReport.csv will be created in your current working
-directory::
+By default report LitenDuplicateReport.csv is created in your current working
+directory. It is tab separated CSV file::
 
-	Duplicate Version,     Path,       Size,       ModDate
-	Original, /Users/ngift/Downloads/bzr-0-2.17.tar, 7 MB, 07/10/2007 01:43:12 AM
-	Duplicate, /Users/ngift/Downloads/bzr-0-3.17.tar, 7 MB, 07/10/2007 01:43:27 AM
+    Path	Size	ModDate
+    /Users/ngift/Downloads/bzr-0-2.17.tar	7 MB	07/10/2007 01:43:12 AM
+    /Users/ngift/Downloads/bzr-0-3.17.tar	7 MB	07/10/2007 01:43:27 AM
 
 
 Debug Mode Environmental Variables:
@@ -149,7 +142,7 @@ import os
 import datetime
 import re
 import sys
-import string
+import csv
 import time
 import optparse
 import hashlib
@@ -170,13 +163,26 @@ if __debug__:
         print "%s Print Mode" % MESSAGE
     if LITEN_DEBUG_MODE == 2:
         print "%s pdb Mode" % MESSAGE
-class ActionsMixin(object):
-    """An Actions Mixin Class"""
 
-    def remove(self, file, dryrun=False, interactive=False):
+
+class ActionsMixin(object):
+    """Subclassable API. Callbacks that Liten calls for actions, i.e. remove()
+
+       Default class does nothing.
+    """
+
+    def remove(self, file, dryrun=False):
+        """action to take when file is requested to be removed
+        """
+        pass
+
+class ActionsAutomatic(ActionsMixin):
+    """Process automatically, i.e. remove files"""
+
+    def remove(self, file, dryrun=False):
+           """takes a path and deletes file/unlinks
            """
-           takes a path and deletes file/unlinks
-           """
+
            #simulation mode for deletion
            if dryrun:
                print "Dry Run:  %s [NOT DELETED]" % file
@@ -188,6 +194,11 @@ class ActionsMixin(object):
                except Exception, err:
                    print err
                    return status
+
+class ActionsInteractive(ActionsMixin):
+    """Confirm each action interactively"""
+
+    def remove(self, file, dryrun=False):
 
            #interactive deletion mode
            if interactive:
@@ -207,8 +218,10 @@ class ActionsMixin(object):
                    return None
 
 
-
 class FileAttributes(object):
+
+    def __init__(self):
+        self.fileSize = None
 
     def makeModDate(self,path):
         """
@@ -277,7 +290,8 @@ class FileAttributes(object):
         if LITEN_DEBUG_MODE == 2:
             pdb.set_trace()
 
-        patterns = {'bytes': '1',
+        patterns = {'BYTES': '1',
+                    'B':  '1',
                     'KB': '1024',
                     'MB': '1048576',
                     'GB': '1073741824',
@@ -286,29 +300,30 @@ class FileAttributes(object):
         #Detects File Size Type, Strips off Characters
         #Converts value to bytes
         try:
+            filesize = self.fileSize.upper()
             for key in patterns:
                 value = patterns[key]
 
-                #print self.fileSize
-                if re.search(key, self.fileSize):
+                if re.match("\d+%s$" % key, filesize):
                     if LITEN_DEBUG_MODE:
-                        print "Key: %s Filesize: %s " % (key, self.fileSize)
+                        print "Key: %s Filesize: %s " % (key, filesize)
                         print "Value: %s " % value
-                    byteValue = int(self.fileSize.strip(key)) * int(value)
+                    byteValue = int(filesize.rstrip(key)) * int(value)
                     #print "Converted byte value: %s " % byteValue
                     break
             else:
-                byteValue = int(self.fileSize.strip()) * int(1048576)
+                byteValue = int(filesize.strip()) * int(1048576)
                 #print "Converted byte value: %s " % byteValue
-        except Exception, err:
+        except ValueError, err:
             if LITEN_DEBUG_MODE:
                 print "Problem evaluating:", self.fileSize, Exception, err
             else:
-                pass    #Note this gets caught using optparse which is cleaner
+                raise UnboundLocalError
+                #Note this gets caught using optparse which is cleaner
         return byteValue
 
 
-class Liten(FileAttributes, ActionsMixin):
+class Liten(FileAttributes):
     """
     A base class for searching a file tree.
 
@@ -317,9 +332,7 @@ class Liten(FileAttributes, ActionsMixin):
     duplicates.
 
     You may modify the action that occurs when a duplicate is
-    found my either creating an ActionsMixin method, or
-    you can pass Liten a function that takes a file argument
-    and process that file object.
+    found my subclassing ActionsMixin and specify it as a handler.
 
     >>> Liten = Liten(spath='testData')
     >>> fakePath = 'testData/testDocOne.txt'
@@ -349,8 +362,7 @@ class Liten(FileAttributes, ActionsMixin):
                     reportPath="LitenDuplicateReport.csv",
                     config = None,
                     verbose = True,
-                    delete = False,
-                    action = False):
+                    handler = False):
 
         self.spath = spath
         self.reportPath = reportPath
@@ -365,8 +377,12 @@ class Liten(FileAttributes, ActionsMixin):
         self.confirmed_dup_value = {}
         self.byte_cache = {}
         self.matches = []
-        self.delete = delete
-        self.action = action
+        if not handler:
+            self.handler = ActionsMixin()
+        else:
+            if not isinstance(handler, ActionsMixin):
+                raise TypeError("specified parameter is not ActionsMixin subclass")
+            self.handler = handler                
 
         self.dupNumber = 0
 
@@ -394,8 +410,6 @@ class Liten(FileAttributes, ActionsMixin):
         that has been found before.  The checksum is then used as the basis to
         determine duplicates.
 
-        (Note that test includes .svn directory)
-
         >> from liten import Liten
         >>> Liten = Liten(spath='testData', verbose=False)
         >>> Liten.diskWalker()
@@ -403,7 +417,7 @@ class Liten(FileAttributes, ActionsMixin):
         >>> Liten.fileSize="45bytes"
         >>> dupes = Liten.diskWalker()
         >>> print len(dupes)
-        4
+        2
 
         """
         #optional pdb Debug Mode
@@ -412,7 +426,10 @@ class Liten(FileAttributes, ActionsMixin):
                 pdb.set_trace()
 
         #Local Variables
-        report = open(self.reportPath, 'w')
+        report = csv.writer(open(self.reportPath, 'wb'), dialect='excel-tab')
+        #  write header
+        report.writerow("Path Size ModDate".split())
+
         if isinstance(self.spath, basestring):
             main_path = os.walk(self.spath)
         else:
@@ -440,7 +457,7 @@ class Liten(FileAttributes, ActionsMixin):
                     record_count += 1
                     #File Size, Pattern Filter Section
                     if byte_size >= byteSizeThreshold:
-                        if fnmatch(path, self.pattern):		#default * match
+                        if fnmatch(path, self.pattern):         #default * match
                             if LITEN_DEBUG_MODE == 1:
                                 print "Matches: %s" % path
 
@@ -495,27 +512,21 @@ class Liten(FileAttributes, ActionsMixin):
                                     if self.verbose:
                                         print byte_size/1048576, "MB ", "ORIG: ",\
                                         orig_path, "DUPE: ", path
-
-                                    #write out to report
-                                    report.write("Duplicate Version,     Path,      \
-                                    Size,       ModDate\n")
-                                    #Write original line
-                                    report.write("%s, %s, %s MB, %s\n" % ("Original",\
-                                    orig_path, byte_size/1048576, orig_mod_date))
+                                    
+                                    #Write separator and original line
+                                    report.writerow("")
+                                    report.writerow([orig_path,
+                                        "%d MB" % (byte_size/1048576), orig_mod_date])
 
                                     #Gets Duplicates Modification Date
                                     dupeModDate = self.makeCreateDate(path)
 
                                     #Write duplicate line
-                                    report.write("%s, %s, %s MB, %s\n" % ("Duplicate",\
-                                    path, byte_size/1048576, dupeModDate))
+                                    report.writerow([path,
+                                        "%d MB" % (byte_size/1048576), dupeModDate])
 
-                                    #Runtime Decision
-                                    if self.action:
-                                        self.action(path)
-                                    else:
-                                        if self.delete:
-                                            self.remove(path)
+                                    #Execute remove() action from ActionMixin
+                                    self.handler.remove(path)
 
                                     #Note this is a good spot for the dup rec count
                                     self.confirmed_dup_key[orig_path] = self.checksum_cache_value
@@ -601,31 +612,28 @@ class LitenController(object):
             if LITEN_DEBUG_MODE == 2:
                 pdb.set_trace()
 
-        descriptionMessage = """
-        A command line tool for detecting duplicates using md5 checksums.
-        """
+        descriptionMessage = "A command line tool for detecting duplicates using md5 checksums."
 
         p = optparse.OptionParser(description=descriptionMessage,
                                     prog='liten',
                                     version='liten %s' % __version__,
                                     usage= '%prog [options] [starting dir1] [dir2] ...')
-        p.add_option('--config', '-c',
-                    help='Path to read in config file')
+        p.add_option('--config', '-c', help='path to config file')
         p.add_option('--size', '-s',
-                    help='File Size Example:  10bytes, 10KB, 10MB,10GB,10TB \
-                    plain number defaults to MB (1 = 1MB)',
+                    help='minimum file size, example:  10bytes, 10KB, 10MB, 10GB, 10TB '
+                    '(no suffix means MB)',
                     default='1MB')
         p.add_option('--pattern', '-p',
-                    help='Pattern Match Examples: *.txt, *.iso, music[0-5].mp3',
+                    help='pattern match examples: *.txt, *.iso, music[0-5].mp3',
                     default='*')
         p.add_option('--quiet', '-q', action="store_true",
-                    help='Suppresses all STDOUT.',default=False)
+                    help='suppress all screen output',default=False)
         p.add_option('--delete', '-d', action="store_true",
                     help='DELETES all duplicate matches permanently!',default=False)
         p.add_option('--report', '-r',
-                    help='Path to store duplicate report. Default CWD',
+                    help='path to store duplicate report (./LitenDuplicateReport.csv by default)',
                     default='LitenDuplicateReport.csv')
-        p.add_option('--test', '-t', action="store_true",help='Runs doctest.')
+        p.add_option('--test', '-t', action="store_true",help='run doctests')
 
         options, arguments = p.parse_args()
 
@@ -668,12 +676,16 @@ class LitenController(object):
                    % arg
                    sys.exit(1)
             try:
+                if options.delete:
+                    actions_handler = ActionsAutomatic()
+                else:
+                    actions_handler = ActionsMixin()
                 start = Liten(spath = arguments,
                             fileSize = options.size,
                             pattern = options.pattern,
                             reportPath=options.report,
                             verbose=verbose,
-                            delete = options.delete)
+                            handler = actions_handler)
                 start.diskWalker()
             #Here I catch bogus size input exceptions
             except UnboundLocalError, err:

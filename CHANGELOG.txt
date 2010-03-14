@@ -1,3 +1,25 @@
+2009-11-08
+techtonik
+
+* size is now case-insensitive
+* use csv module for generating report
+* report format changed
+  - no notion of original/duplicate
+  - tab separated CSV
+  - header repeated only once at file start
+  - duplicate groups are separated by blank line
+* docs can be read with standard python help() function
+
+* API changed
+  - 'action' callback parameter is removed from Liten constructor. Use 'handler'
+    parameter with ActionsMixin subclass to alter remove() action logic
+  - ActionsMixin not a parent, but a parameter to Liten class constructor.
+    This allows to specify own behaviour for remove() and future actions
+  - 'delete' parameter is removed from Liten() constructor - use ActionAutomatic
+    handler for file deletion
+
+  (P.S. ActionMixin is now a Strategy pattern for handling duplicates)
+
 2008-12-25
 techtonik
 0.1.5
